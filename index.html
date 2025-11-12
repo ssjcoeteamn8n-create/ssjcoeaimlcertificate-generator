@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Certificate Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the certificate viewer and form */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+        }
+        .certificate-container {
+            width: 100%;
+            max-width: 900px; /* Standard certificate width */
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            background-color: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            border-radius: 8px;
+        }
+        /* Mobile optimization for form */
+        @media (max-width: 640px) {
+            .certificate-container {
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Certificate Generation Hub</h1>
+
+        <!-- The Input Form --><div id="input-form" class="bg-white p-6 rounded-lg shadow-lg mb-8 border border-gray-200">
+            <h2 class="text-xl font-semibold text-blue-700 mb-4">Enter Participant Details</h2>
+            <form id="certificateForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <label class="block">
+                    <span class="text-gray-700">Participant Full Name (Title & Name)</span>
+                    <input type="text" id="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., Mr. John Doe" required>
+                </label>
+
+                <label class="block">
+                    <span class="text-gray-700">Event Name</span>
+                    <input type="text" id="eventName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., Leadership Workshop 2024" required>
+                </label>
+
+                <label class="block">
+                    <span class="text-gray-700">Organization Name (Organizer)</span>
+                    <input type="text" id="orgName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., Tech Innovations Inc." required>
+                </label>
+
+                <label class="block">
+                    <span class="text-gray-700">Event Date (e.g., 2025/10/26)</span>
+                    <input type="text" id="eventDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., October 26, 2025" required>
+                </label>
+
+                <label class="block">
+                    <span class="text-gray-700">Issue Date</span>
+                    <input type="text" id="issueDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., November 10, 2025" required>
+                </label>
+
+                <label class="block">
+                    <span class="text-gray-700">Signatory Name</span>
+                    <input type="text" id="signatoryName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., Jane Smith" required>
+                </label>
+
+                <label class="block">
+                    <span class="text-gray-700">Signatory Designation</span>
+                    <input type="text" id="designation" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., CEO" required>
+                </label>
+
+                <div class="md:col-span-2 mt-4">
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-150 shadow-md">
+                        Generate Certificate
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- The Certificate Output --><div id="certificateOutput" class="hidden">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Generated Certificate Preview</h2>
+            
+            <div class="certificate-container">
+                <canvas id="certificateCanvas" width="900" height="636" class="w-full h-auto"></canvas>
+            </div>
+            
+            <div class="mt-4 text-center">
+                <a id="downloadLink" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-150 shadow-md cursor-pointer" download="Certificate_of_Participation.png">
+                    Download Certificate (PNG)
+                </a>
+            </div>
+
+            <button onclick="document.getElementById('certificateOutput').classList.add('hidden'); document.getElementById('input-form').classList.remove('hidden');" class="mt-4 w-full text-blue-600 hover:text-blue-800 font-medium py-2">
+                &larr; Generate Another Certificate
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Helper function to wrap text on the canvas (टेक्स्ट को कैनवस पर रैप करने का सहायक फंक्शन)
+        function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = '';
+            let lineCount = 0;
+
+            for (let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                const metrics = ctx.measureText(testLine);
+                const testWidth = metrics.width;
+
+                if (testWidth > maxWidth && n > 0) {
+                    ctx.fillText(line, x, y + (lineCount * lineHeight));
+                    line = words[n] + ' ';
+                    lineCount++;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, x, y + (lineCount * lineHeight));
+            // Return the final Y position of the last line drawn
+            return y + ((lineCount + 1) * lineHeight); 
+        }
+
+        document.getElementById('certificateForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Collect all data from the form 
+            const data = {
+                name: document.getElementById('name').value,
+                eventName: document.getElementById('eventName').value,
+                orgName: document.getElementById('orgName').value,
+                eventDate: document.getElementById('eventDate').value,
+                issueDate: document.getElementById('issueDate').value,
+                signatoryName: document.getElementById('signatoryName').value,
+                designation: document.getElementById('designation').value,
+            };
+
+            // Call the generation function 
+            generateCertificate(data);
+
+            // Hide form and show output 
+            document.getElementById('input-form').classList.add('hidden');
+            document.getElementById('certificateOutput').classList.remove('hidden');
+            window.scrollTo(0, 0); 
+        });
+
+        function generateCertificate(data) {
+            const canvas = document.getElementById('certificateCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Dimensions for A4 Landscape ratio (900x636) 
+            const W = canvas.width;
+            const H = canvas.height;
+            const P = 60; // Padding 
+
+            // --- 1. Draw Background and Borders (Simulating Template)  ---
+            
+            // White Background 
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, W, H);
+            
+            const darkBlue = '#0B3C61';
+            const gold = '#C59A45';
+
+            // Top-Left Blue/Gold Wave 
+            ctx.fillStyle = darkBlue;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(W * 0.4, 0);
+            ctx.bezierCurveTo(W * 0.3, H * 0.15, W * 0.1, H * 0.1, 0, H * 0.25);
+            ctx.closePath();
+            ctx.fill();
+
+            // Top-Left Gold Layer
+            ctx.fillStyle = gold;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(W * 0.35, 0);
+            ctx.bezierCurveTo(W * 0.25, H * 0.08, W * 0.05, H * 0.05, 0, H * 0.18);
+            ctx.closePath();
+            ctx.fill();
+
+            // Bottom-Right Blue Wave 
+            ctx.fillStyle = darkBlue;
+            ctx.beginPath();
+            ctx.moveTo(W, H);
+            ctx.lineTo(W * 0.6, H);
+            ctx.bezierCurveTo(W * 0.7, H * 0.85, W * 0.9, H * 0.9, W, H * 0.75);
+            ctx.closePath();
+            ctx.fill();
+
+            // Bottom-Right Gold Layer 
+            ctx.fillStyle = gold;
+            ctx.beginPath();
+            ctx.moveTo(W, H);
+            ctx.lineTo(W * 0.65, H);
+            ctx.bezierCurveTo(W * 0.75, H * 0.92, W * 0.95, H * 0.95, W, H * 0.82);
+            ctx.closePath();
+            ctx.fill();
+            
+            // --- 2. Draw Gold Seal (Simplified)  ---
+            const sealX = P + 40;
+            const sealY = P + 40;
+            const sealRadius = 30;
+
+            // Gradient for Gold Effect 
+            const grad = ctx.createLinearGradient(sealX - sealRadius, sealY - sealRadius, sealX + sealRadius, sealY + sealRadius);
+            grad.addColorStop(0, '#FFF6A7');
+            grad.addColorStop(0.5, '#C59A45');
+            grad.addColorStop(1, '#A07936');
+
+            // Draw Gold Circle 
+            ctx.beginPath();
+            ctx.arc(sealX, sealY, sealRadius, 0, Math.PI * 2, false);
+            ctx.fillStyle = grad;
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#A07936';
+            ctx.stroke();
+
+            // Draw Inner Star (Simplified) 
+            ctx.font = '24px serif';
+            ctx.fillStyle = darkBlue;
+            ctx.textAlign = 'center';
+            ctx.fillText('\u2605', sealX, sealY + 8); // Unicode star 
+
+            // --- 3. Draw Text Content (Dynamic)  ---
+
+            // CERTIFICATE OF PARTICIPATION 
+            ctx.fillStyle = darkBlue;
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 50px Arial';
+            ctx.fillText('CERTIFICATE', W / 2, H * 0.2);
+            
+            ctx.font = '24px Arial';
+            ctx.fillText('OF PARTICIPATION', W / 2, H * 0.25);
+            
+            // Presented To 
+            ctx.fillStyle = '#333';
+            ctx.font = '20px serif';
+            ctx.fillText('This certificate is proudly presented to', W / 2, H * 0.35);
+
+            // Participant Name (Title & Name) 
+            ctx.fillStyle = darkBlue;
+            ctx.font = 'italic bold 48px Georgia'; 
+            ctx.fillText(data.name, W / 2, H * 0.45);
+            
+            // Horizontal Line under Name 
+            ctx.beginPath();
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 1;
+            ctx.moveTo(W / 2 - 250, H * 0.47);
+            ctx.lineTo(W / 2 + 250, H * 0.47);
+            ctx.stroke();
+
+            // Main Body Text (Wrapped and positioned) 
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'left';
+            ctx.font = '18px Arial'; 
+            
+            const lineHeight = 28;
+            const textMaxWidth = W - (2 * P); // 780px available width 
+            let currentY = H * 0.53; // Start position 
+
+            // Line 1: Participation (भाग लेना)
+            let text1 = `has successfully participated in the event ${data.eventName} organized by ${data.orgName} on ${data.eventDate}.`;
+            currentY = wrapText(ctx, text1, P, currentY, textMaxWidth, lineHeight);
+            
+            // Line 2: Appreciation (सराहना)
+            let text2 = `We appreciate their enthusiasm, effort, and active involvement throughout the event.`;
+            currentY = wrapText(ctx, text2, P, currentY + 10, textMaxWidth, lineHeight);
+
+            // --- 4. Signatures and Dates (ADJUSTED POSITIONING) ---
+            
+            // Adjusted for overall position
+            const signatureBlockY = H * 0.73; 
+            
+            const textBaselineY = signatureBlockY; 
+            // Removed signatureLineY variable and code as the line is being removed
+            
+            // Positioned name/designation relative to textBaselineY
+            const signatoryNameY = textBaselineY + 30; // Closer to Authorized by
+            const designationY = signatoryNameY + 20; 
+
+            const issuedX = P; // Left column start 
+            const signatureLineWidth = 200;
+
+            // Adjusted 'Authorized by' block position to be further left
+            const authorizedBlockLeftX = W * 0.55; // Left edge of the 'Authorized by' block area
+            const authorizedTextX = authorizedBlockLeftX; // 'Authorized by:' text starts here
+            
+            // Signatory text will be centered within the signature block width
+            const signatoryTextCenterX = authorizedBlockLeftX + signatureLineWidth / 2; // Center for name/designation
+
+            // Issued On (Left Side - Left Aligned) 
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('Issued on:', issuedX, textBaselineY);
+            ctx.font = '20px Arial';
+            ctx.fillText(data.issueDate, issuedX + 120, textBaselineY);
+
+            // Authorized By (Right Side - Left Aligned) 
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('Authorized by:', authorizedTextX, textBaselineY); 
+            
+            // Signatory Name and Designation (Centered under the Authorized by text) 
+            ctx.textAlign = 'center';
+            ctx.font = '20px Arial';
+            // Adjusted X to center and Y for vertical spacing
+            ctx.fillText(data.signatoryName, signatoryTextCenterX, signatoryNameY);
+            
+            ctx.font = 'italic 16px Arial';
+            // Adjusted X to center
+            ctx.fillText(data.designation, signatoryTextCenterX, designationY);
+
+            // --- 5. Final Download Setup  ---
+
+            // Convert canvas to data URL and set link 
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = canvas.toDataURL('image/png');
+            downloadLink.download = `${data.name.replace(/\s/g, '_')}_Certificate.png`;
+        }
+
+        // Optional: Pre-fill some data for testing ease 
+        document.getElementById('name').value = 'eg.John';
+        document.getElementById('eventName').value = 'AI Tools Workshop';
+        document.getElementById('orgName').value = 'Shivajirao S Jondhale college of engineering';
+        document.getElementById('eventDate').value = 'October 31 2025';
+        document.getElementById('issueDate').value = 'November 12, 2025';
+        document.getElementById('signatoryName').value = 'Mrunal Valte';
+        document.getElementById('designation').value = 'AI&ML Department';
+
+    </script>
+</body>
+</html>
